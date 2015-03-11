@@ -1,4 +1,4 @@
-function TagData = d3makeprhfile_simple(tag,df, TagData, nTagData)
+function    TagData = d3makeprhfile_mod(recdir,prefix,tag,df, TagData, nTagData)
 %
 %   d3makeprhfile(recdir,prefix,tag,df)
 %   Generate a complete PRH file from raw sensor data using calibrations
@@ -27,32 +27,27 @@ if ~exist('CAL','var')
    return
 end
 
-% load(offline_Data)
-% X = d3readswv(recdir,prefix) ;
-X = TagData(nTagData).RawVolt;
-p = TagData(nTagData).depth;
-A = TagData(nTagData).accelTag;
-M = TagData(nTagData).magTag;
-CAL = TagData(nTagData).Calib;
-fs = TagData(nTagData).sampleFreq;
+X = d3readswv(recdir,prefix) ;
+
 % apply calibrations
-% [p,CAL,fsp] = d3calpressure(X,CAL,'none') ;
-% [M,CAL,fsm] = d3calmag(X,CAL,'none') ;
-% [A,CAL,fs] = d3calacc(X,CAL,'none') ;
+[p,CAL,fsp] = d3calpressure(X,CAL,'none') ;
+[M,CAL,fsm] = d3calmag(X,CAL,'none') ;
+[A,CAL,fs] = d3calacc(X,CAL,'none') ;
 
 % check sampling rates are compatible
-% if fsp~=fs || fsm(1)~=fs,
-%    fprintf('Different sampling rates on p, A and M not yet supported\n') ;
-%    return
-% end
+if fsp~=fs || fsm(1)~=fs,
+   fprintf('Different sampling rates on p, A and M not yet supported\n') ;
+   return
+end
 
 % decimate all channels
 % if nargin==4 && df~=1,
-%    p = decdc(p,df) ;
-%    M = decdc(M,df) ;
-%    A = decdc(A,df) ;
-%    fs = fs/df ;
-% end
+if df~= 1
+   p = decdc(p,df) ;
+   M = decdc(M,df) ;
+   A = decdc(A,df) ;
+   fs = fs/df ;
+end
 
 % check the lengths of the A, M and p matrices
 S = [size(A,1),size(M,1),length(p)] ;
@@ -85,10 +80,7 @@ if ~isfield(DEPLOY,'OTAB'),
 end
 
 % report on trustworthiness of heading estimate
-aa = find(~isnan(A(:,1)));
-mm = find(~isnan(M(:,1)));
-ind_nonnan = intersect(aa, mm);
-dp = (A(ind_nonnan,:).*M(ind_nonnan,:)*[1;1;1])./norm2(M(ind_nonnan,:)) ;
+dp = (A.*M*[1;1;1])./norm2(M) ;
 incl = asin(mean(dp)) ;     % do the mean before the asin to avoid problems
                             % when the specific acceleration is large
 sincl = asin(std(dp)) ;
@@ -113,10 +105,8 @@ head = head + DECL*pi/180 ;      % adjust heading for declination angle in radia
 % save results
 if vv(1)>'6',
    save(fname,'-v6','p','pitch','roll','head','fs','Aw','Mw','A','M') ;
-   fprintf('Created MAT file %s\n', fname)
 else
    save(fname,'p','pitch','roll','head','fs','Aw','Mw','A','M') ;
-   fprintf('Created MAT file %s\n', fname)
 end
 
 TagData(nTagData).pitchDeg = rad2deg(pitch);
